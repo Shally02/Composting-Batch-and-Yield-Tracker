@@ -119,13 +119,7 @@ public:
         return this->batchId;
     }
 
-    void searchBatch(int id)
-{
-    if (this->batchId == id)
-    {
-        display();
-    }
-}
+
 
     static void increaseCount()
     {
