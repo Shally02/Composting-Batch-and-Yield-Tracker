@@ -1,8 +1,21 @@
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <limits>
+#include <cstring>
 using namespace std;
+
+struct BatchRecord
+{
+    int batchId;
+    char wasteType[50];
+    float initialWeight;
+    float finalWeight;
+    char startDate[20];
+    char expectedDate[20];
+    char status[20];
+};
 
 class CompostBatch
 {
@@ -19,6 +32,7 @@ private:
 
 public:
 
+    // Default constructor
     CompostBatch()
     {
         batchId = 0;
@@ -26,6 +40,63 @@ public:
         finalWeight = 0;
         status = "Processing";
     }
+
+    // Parameterized constructor
+    CompostBatch(int id, string waste, float weight)
+    {
+        batchId = id;
+        wasteType = waste;
+        initialWeight = weight;
+        finalWeight = 0;
+        startDate = "";
+        expectedDate = "";
+        status = "Processing";
+    }
+
+    // Copy constructor
+    CompostBatch(const CompostBatch &obj)
+    {
+        batchId = obj.batchId;
+        wasteType = obj.wasteType;
+        initialWeight = obj.initialWeight;
+        finalWeight = obj.finalWeight;
+        startDate = obj.startDate;
+        expectedDate = obj.expectedDate;
+        status = obj.status;
+    }
+
+    // Destructor
+    ~CompostBatch()
+    {
+        cout << "\nCompostBatch object destroyed";
+    }
+
+    BatchRecord toRecord() const
+    {
+        BatchRecord r;
+
+        r.batchId = batchId;
+        strcpy(r.wasteType, wasteType.c_str());
+        r.initialWeight = initialWeight;
+        r.finalWeight = finalWeight;
+        strcpy(r.startDate, startDate.c_str());
+        strcpy(r.expectedDate, expectedDate.c_str());
+        strcpy(r.status, status.c_str());
+
+        return r;
+    }
+
+    void fromRecord(BatchRecord r)
+    {
+        batchId = r.batchId;
+        wasteType = r.wasteType;
+        initialWeight = r.initialWeight;
+        finalWeight = r.finalWeight;
+        startDate = r.startDate;
+        expectedDate = r.expectedDate;
+        status = r.status;
+    }
+
 
     
     bool input(CompostBatch batches[], int count)
@@ -126,6 +197,11 @@ public:
         totalBatches++;
     }
 
+    static void setTotalBatches(int n)
+    {
+        totalBatches = n;
+    }
+
     static int getTotalBatches()
     {
         return totalBatches;
@@ -133,6 +209,189 @@ public:
 
     friend void showBatchDetails(const CompostBatch &b);
 };
+
+void saveBatch(CompostBatch &b)
+{
+    fstream file("data/batches.dat", ios::out | ios::app | ios::binary);
+
+    if (!file)
+    {
+        cout << "Error opening file!";
+        return;
+    }
+
+    BatchRecord r = b.toRecord();
+
+    file.write(reinterpret_cast<char*>(&r), sizeof(r));
+
+    file.close();
+
+    cout << "Batch saved successfully!";
+}
+
+    void readBatches()
+{
+    ifstream file("data/batches.dat", ios::in | ios::binary);
+
+    if (!file)
+    {
+        cout << "\nFile could not be opened!";
+        return;
+    }
+
+    cout << "\nFile opened successfully!";
+
+    BatchRecord r;
+    int total = 0;
+
+    while (file.read(reinterpret_cast<char*>(&r), sizeof(r)))
+    {
+        CompostBatch b;
+        b.fromRecord(r);
+        b.display();
+        total++;
+    }
+
+    cout << "\nTotal records read: " << total;
+
+    file.close();
+}
+
+void searchBatch(int id)
+{
+    ifstream file("data/batches.dat", ios::in | ios::binary);
+
+    if (!file)
+    {
+        cout << "\nUnable to open file!";
+        return;
+    }
+
+    BatchRecord r;
+    bool found = false;
+
+    int index = 0;
+
+while (true)
+{
+    file.seekg(index * sizeof(BatchRecord), ios::beg);
+
+    if (!file.read(reinterpret_cast<char*>(&r), sizeof(r)))
+    {
+        break;
+    }
+
+    if (r.batchId == id)
+    {
+        CompostBatch b;
+        b.fromRecord(r);
+
+        cout << "\nBatch Found!";
+        b.display();
+
+        found = true;
+        break;
+    }
+
+    index++;
+}
+
+    if (!found)
+    {
+        cout << "\nBatch not found!";
+    }
+
+    file.close();
+}
+
+void updateBatch(int id)
+{
+    fstream file("data/batches.dat", ios::in | ios::out | ios::binary);
+
+    if (!file)
+    {
+        cout << "\nUnable to open file!";
+        return;
+    }
+
+    BatchRecord r;
+    bool found = false;
+    int index = 0;
+
+    while (file.read(reinterpret_cast<char*>(&r), sizeof(r)))
+    {
+        if (r.batchId == id)
+        {
+            found = true;
+            break;
+        }
+
+        index++;
+    }
+
+    if (!found)
+    {
+        cout << "\nBatch not found!";
+        file.close();
+        return;
+    }
+
+    cout << "\nCurrent Final Weight: " << r.finalWeight;
+
+    cout << "\nEnter Final Compost Weight: ";
+    while (!(cin >> r.finalWeight) || r.finalWeight < 0)
+    {
+        cout << "Enter a valid weight: ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+
+    cout << "\nEnter New Status: ";
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    cin.getline(r.status, 20);
+
+    file.clear();
+    file.seekp(index * sizeof(BatchRecord), ios::beg);
+
+    file.write(reinterpret_cast<char*>(&r), sizeof(r));
+
+    cout << "\nBatch updated successfully!";
+
+    file.close();
+}
+
+void loadBatches(CompostBatch batches[], int &count)
+{
+    ifstream file("data/batches.dat", ios::in | ios::binary);
+
+    if (!file)
+    {
+        cout << "\nNo previous records found.";
+        return;
+    }
+
+    BatchRecord r;
+
+    count = 0;
+
+    while (file.read(reinterpret_cast<char*>(&r), sizeof(r)))
+    {
+        if (count >= 100)
+        {
+            break;
+        }
+
+        batches[count].fromRecord(r);
+        count++;
+    }
+
+    file.close();
+
+    cout << "\n" << count << " batches loaded successfully!";
+}
+
+
+
 
 int CompostBatch::totalBatches = 0;
 
@@ -156,12 +415,18 @@ void showBatchDetails(const CompostBatch &b)
     cout << "\n--------------------------------\n";
 }
 
+
+
 int main()
 {
     CompostBatch batches[100];
 
     int count = 0;
     int choice;
+
+    loadBatches(batches, count);
+    CompostBatch::setTotalBatches(count);
+
 
     do
     {
@@ -172,10 +437,11 @@ int main()
         cout << "\n2. View All Compost Batches";
         cout << "\n3. Search Compost Batch";
         cout << "\n4. View Total Number of Batches";
-        cout << "\n5. Exit";
+        cout << "\n5. Update Compost Batch";
+        cout << "\n6. Exit";
         cout << "\nEnter your choice: ";
 
-        while (!(cin >> choice) || choice < 1 || choice > 5)
+        while (!(cin >> choice) || choice < 1 || choice > 6)
         {
             cout << "Enter a valid choice (1-5): ";
             cin.clear();
@@ -196,10 +462,9 @@ int main()
             
                 if (ptr->input(batches, count))
                 {
+                    saveBatch(*ptr);
                     count++;
                     CompostBatch::increaseCount();
-                
-                    cout << "\nBatch added successfully!";
                 }
             
                 break;
@@ -207,28 +472,13 @@ int main()
 
             case 2:
             {
-                if (count == 0)
-                {
-                    cout << "\nNo compost batches available.";
-                }
-                else
-                {
-                    cout << "\n========== ALL COMPOST BATCHES ==========";
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        CompostBatch *ptr = &batches[i];
-                        ptr->display();
-                    }
-                }
-
+                readBatches();
                 break;
             }
 
-            case 3:
+           case 3:
             {
                 int id;
-                bool found = false;
             
                 cout << "\nEnter Batch ID to search: ";
             
@@ -239,21 +489,7 @@ int main()
                     cin.ignore(numeric_limits<streamsize>::max(), '\n');
                 }
             
-                for (int i = 0; i < count; i++)
-                {
-                    if (batches[i].getBatchId() == id)
-                    {
-                        cout << "\nBatch Found!";
-                        batches[i].display();
-                        found = true;
-                        break;
-                    }
-                }
-            
-                if (!found)
-                {
-                    cout << "\nBatch not found!";
-                }
+                searchBatch(id);
             
                 break;
             }
@@ -267,12 +503,29 @@ int main()
 
             case 5:
             {
+                int id;
+            
+                cout << "\nEnter Batch ID to update: ";
+            
+                while (!(cin >> id) || id <= 0)
+                {
+                    cout << "Enter a valid Batch ID: ";
+                    cin.clear();
+                    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                }
+            
+                updateBatch(id);
+                break;
+            }
+
+            case 6:
+            {
                 cout << "\nThank you for using the application!";
                 break;
             }
         }
 
-    } while (choice != 5);
+    } while (choice != 6);
 
     return 0;
 }
