@@ -68,7 +68,6 @@ public:
     // Destructor
     ~CompostBatch()
     {
-        cout << "\nCompostBatch object destroyed";
     }
 
     BatchRecord toRecord() const
@@ -130,9 +129,13 @@ public:
         cout << "Enter Waste Type: ";
         getline(cin, wasteType);
 
-        while (wasteType.find_first_not_of(" \t") == string::npos)
+        while (wasteType.find_first_not_of(" \t") == string::npos || wasteType.length() >= 50)
         {
-            cout << "Waste type cannot be empty. Enter again: ";
+            if (wasteType.length() >= 50)
+                cout << "Waste type must be less than 50 characters. Enter again: ";
+            else
+                cout << "Waste type cannot be empty. Enter again: ";
+        
             getline(cin, wasteType);
         }
 
@@ -150,18 +153,18 @@ public:
         cout << "Enter Start Date: ";
         getline(cin, startDate);
 
-        while (startDate.empty())
+        while (startDate.empty() || startDate.length() >= 20)
         {
-            cout << "Enter a valid start date: ";
+            cout << "Enter a valid start date (maximum 19 characters): ";
             getline(cin, startDate);
         }
 
         cout << "Enter Expected Completion Date: ";
         getline(cin, expectedDate);
 
-        while (expectedDate.empty())
+        while (expectedDate.empty() || expectedDate.length() >= 20)
         {
-            cout << "Enter a valid expected date: ";
+            cout << "Enter a valid expected date (maximum 19 characters): ";
             getline(cin, expectedDate);
         }
 
@@ -210,23 +213,30 @@ public:
     friend void showBatchDetails(const CompostBatch &b);
 };
 
-void saveBatch(CompostBatch &b)
+bool saveBatch(CompostBatch &b)
 {
-    fstream file("data/batches.dat", ios::out | ios::app | ios::binary);
+    ofstream file("data/batches.dat", ios::app | ios::binary);
 
     if (!file)
     {
-        cout << "Error opening file!";
-        return;
+        cout << "\nError opening file!";
+        return false;
     }
 
     BatchRecord r = b.toRecord();
 
     file.write(reinterpret_cast<char*>(&r), sizeof(r));
 
+    if (!file)
+    {
+        cout << "\nError saving batch!";
+        return false;
+    }
+
     file.close();
 
-    cout << "Batch saved successfully!";
+    cout << "\nBatch saved successfully!";
+    return true;
 }
 
     void readBatches()
@@ -339,16 +349,30 @@ void updateBatch(int id)
     cout << "\nCurrent Final Weight: " << r.finalWeight;
 
     cout << "\nEnter Final Compost Weight: ";
-    while (!(cin >> r.finalWeight) || r.finalWeight < 0)
+
+    while (!(cin >> r.finalWeight) || r.finalWeight < 0 || r.finalWeight > r.initialWeight)
     {
-        cout << "Enter a valid weight: ";
+        cout << "Enter weight between 0 and " << r.initialWeight << ": ";
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
     }
 
-    cout << "\nEnter New Status: ";
+    string newStatus;
+
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    cin.getline(r.status, 20);
+    
+    cout << "\nEnter New Status (Processing/Completed/On Hold): ";
+    getline(cin, newStatus);
+    
+    while (newStatus != "Processing" &&
+           newStatus != "Completed" &&
+           newStatus != "On Hold")
+    {
+        cout << "Invalid status! Enter Processing, Completed or On Hold: ";
+        getline(cin, newStatus);
+    }
+    
+    strcpy(r.status, newStatus.c_str());
 
     file.clear();
     file.seekp(index * sizeof(BatchRecord), ios::beg);
@@ -443,7 +467,7 @@ int main()
 
         while (!(cin >> choice) || choice < 1 || choice > 6)
         {
-            cout << "Enter a valid choice (1-5): ";
+            cout << "Enter a valid choice (1-6): ";
             cin.clear();
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
         }
@@ -462,9 +486,11 @@ int main()
             
                 if (ptr->input(batches, count))
                 {
-                    saveBatch(*ptr);
-                    count++;
-                    CompostBatch::increaseCount();
+                    if (saveBatch(*ptr))
+                    {
+                        count++;
+                        CompostBatch::increaseCount();
+                    }
                 }
             
                 break;
